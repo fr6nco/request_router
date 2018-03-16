@@ -1,14 +1,15 @@
 import * as http from "http"
 
 export class HTTPListener {
-    port: number;
-    server: http.Server;
-    host: string;
+    private port: number;
+    private server: http.Server;
+    private host: string;
 
     constructor(port: number, host: string) {
         this.port = port;
         this.host = host;
         this.server = http.createServer((req, res) => {
+            console.log(req);
             res.end();
         });
         this.server.on('clientError', (err, socket) => {
@@ -18,4 +19,6 @@ export class HTTPListener {
             console.log(`listening on port ${ this.port }`);
         });
     }
+
+
 }
