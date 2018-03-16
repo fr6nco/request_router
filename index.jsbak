@@ -1,0 +1,43 @@
+const net = require('net');
+const http = require('http');
+
+let httpAgent = new http.Agent({keepAlive: true});
+
+let sock = httpAgent.createConnection({port: 443, host:'devel.itprof.sk'}, (err, sock) => {
+    if(err) {
+        console.error(err);
+    }
+});
+
+sock.on('connect', () => {
+    console.log('socket connected');
+
+    let options = {
+        host: 'devel.itprof.sk',
+        port: 443,
+        path: '/',
+        method: 'GET',
+        agent: httpAgent,
+        createConnection: function() {
+            return sock;
+        }
+    };
+    console.log(options);
+
+    let req = http.request(options, (res) => {
+        res.on('data', (data) => {
+            console.log('And here is the result');
+            console.log(data.toString('utf8'));
+        });
+
+        res.on('error', (err) => {
+            console.error(err);
+        });
+    });
+
+    setTimeout(function () {
+        console.log('Just slept for 3 seconds');
+        console.log('Now lets send the request');
+        req.end();
+    }, 3000);
+});
