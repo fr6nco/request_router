@@ -19,6 +19,4 @@ export class HTTPListener {
             console.log(`listening on port ${ this.port }`);
         });
     }
-
-
 }

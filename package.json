@@ -9,14 +9,18 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@types/bluebird": "^3.5.20",
+    "@types/config": "0.0.34",
     "@types/node": "^9.4.7",
+    "@types/zeromq": "^4.6.1",
     "gulp": "^3.9.1",
     "gulp-typescript": "^4.0.1",
     "typescript": "^2.7.2"
   },
   "dependencies": {
-    "@types/config": "0.0.34",
+    "bluebird": "^3.5.1",
     "config": "^1.30.0",
+    "ws": "^5.1.0",
     "zeromq": "^4.6.0"
   }
 }
