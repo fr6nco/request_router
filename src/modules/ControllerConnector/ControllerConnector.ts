@@ -1,56 +1,46 @@
-import * as zeromq from "zeromq"
-import * as Promise from "bluebird"
+import * as q from "bluebird"
+
+const WebSocket = require("rpc-websockets").Client
+const WebSocketServer = require('rpc-websockets').Server
 
 export class ControllerConnector {
 
     private controllerIP: string;
     private controllerPort: number;
+    private wsurl: string;
 
-    private zmq_sock: zeromq.Socket;
+    private wsClient: any;
+    private wsServer: any;
     private connectretries: number = 0;
     private MAXCONNECTRETRIES: number = 5;
 
     private status: string;
 
     public connect() {
-        return new Promise.Promise((resolve, reject) => {
-            this.status = 'CONNECTING';
-            console.log('Trying to establish zMQ connection to ' + `tcp://${this.controllerIP}:${this.controllerPort}`);
+        console.log(`trying to connect to ws://${this.controllerIP}:${this.controllerPort}/${this.wsurl}`);
+        this.wsClient = new WebSocket(`ws://${this.controllerIP}:${this.controllerPort}/${this.wsurl}`);
 
-            this.zmq_sock = zeromq.socket('pair');
+        this.wsClient.on('open', () => {
+            console.log('Connected to websocket');
+            this.wsClient.call('hello').then((res: any) => {
+                console.log(res);
+            })
+        });
 
-            this.zmq_sock.on('connect', (socket) => {
-                this.status = 'CONNECTED';
-                console.log(`Succesfully connected to messaging intereface to controller on tcp://${this.controllerIP}:${this.controllerPort}`);
-                return resolve();
-            });
+        this.wsClient.on('error', (err: any) => {
+            console.error(err);
+            process.exit(1);
+        });
 
-            this.zmq_sock.on('connect_retry', (msg) => {
-                this.connectretries++;
-                if (this.connectretries >= this.MAXCONNECTRETRIES) {
-                    console.log('Failed to connect to server');
-                    this.zmq_sock.close();
-                    this.status = 'ERROR';
-                    //Perhaps this should be an observable as reject might come after resolve;
-                    //TODO
-                    return reject('maxretries exceeded');
-                }
-            });
-
-            this.zmq_sock.on('err', (msg) => {
-                this.status = 'DISCONNECTED';
-                return reject(msg);
-            });
-
-            this.zmq_sock.monitor();
-            this.zmq_sock.connect(`tcp://${this.controllerIP}:${this.controllerPort}`);
-            this.zmq_sock.send('HelloWorld');
+        this.wsClient.on('close', () => {
+            console.log('ws endpoint closed');
         });
     }
 
-    constructor(host: string, port: number) {
+    constructor(host: string, port: number, url: string) {
         this.controllerIP = host;
         this.controllerPort = port;
-        this.zmq_sock = zeromq.socket('pair');
+        this.wsurl = url;
+        this.connect();
     }
 }
