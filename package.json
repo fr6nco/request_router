@@ -20,8 +20,8 @@
   "dependencies": {
     "bluebird": "^3.5.1",
     "config": "^1.30.0",
-    "node-json-rpc": "0.0.1",
     "rpc-websockets": "^4.0.1",
+    "rxjs": "^5.5.8",
     "ws": "^5.1.0"
   }
 }

@@ -24,7 +24,7 @@ export class ControllerConnector {
             console.log('Connected to websocket');
             this.wsClient.call('hello').then((res: any) => {
                 console.log(res);
-            })
+            });
         });
 
         this.wsClient.on('error', (err: any) => {
@@ -34,6 +34,11 @@ export class ControllerConnector {
 
         this.wsClient.on('close', () => {
             console.log('ws endpoint closed');
+        });
+
+        process.on('SIGINT', () => {
+            console.log('Closing WS endpoint');
+            this.wsClient.close();
         });
     }
 
