@@ -45,12 +45,11 @@ class Connection extends EventEmitter {
         };
 
         let sock = net.createConnection(connectionOptions, () => {
+            this.source_port = sock.localPort;
             console.log(`Connected to Service Engine on ${this.source_ip}:${this.source_port} <->${this.dest_ip}:${this.dest_port}`);
             this.setAndEmitState(connState.CONNECTED);
         });
-        
-        this.source_port = sock.localPort;
-        
+                
         sock.on('error', (err) => {
             console.error('Failed to establish connection');
         })
@@ -144,8 +143,6 @@ class ServiceEngine implements Liveness {
                 }
             });
         }
-
-        console.log(this.connections.length);
     }
 
     constructor(ip: string, port: number) {
