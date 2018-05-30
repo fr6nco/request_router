@@ -29,7 +29,7 @@ class Connection extends EventEmitter {
         this.state = connState.ESTABLISHING;
         this.connect();
     }
-    
+
     //Wraps setting state and emits state
     private setAndEmitState(state: connState) {
         this.state = state;
@@ -50,13 +50,13 @@ class Connection extends EventEmitter {
             console.log(`Connected to Service Engine on ${this.source_ip}:${this.source_port} <->${this.dest_ip}:${this.dest_port}`);
             this.setAndEmitState(connState.CONNECTED);
         });
-                
+
         this.socket.on('error', (err) => {
             console.error('Failed to establish connection');
         })
 
         this.socket.on('close', (hadError) => {
-            this.setAndEmitState(hadError ? connState.ERROR: connState.CLOSED);
+            this.setAndEmitState(hadError ? connState.ERROR : connState.CLOSED);
         });
     }
 
@@ -84,6 +84,7 @@ enum ServiceEngineState {
 interface ServiceEngineInterface {
     ip: string;
     port: number;
+    name: string;
 }
 
 const CONNECTIONEVENT = "CONNECTIONEVENT";
@@ -94,7 +95,7 @@ class ServiceEngine extends EventEmitter implements Liveness {
     private agent: http.Agent;
     private connections: Connection[];
     private connectionEventEmitter: EventEmitter;
-    
+
     //Interface types
     limit: number;
     live: number;
@@ -104,14 +105,15 @@ class ServiceEngine extends EventEmitter implements Liveness {
 
     private ip: string;
     private port: number;
+    private name: string;
 
     private faultyTimer: any;
 
     private getLiveness(): Liveness {
         return {
-            limit: this.limit, 
-            live: this.connections.filter(e => e.state == connState.CONNECTED).length, 
-            errors: this.errors, 
+            limit: this.limit,
+            live: this.connections.filter(e => e.state == connState.CONNECTED).length,
+            errors: this.errors,
             establishing: this.connections.filter(e => e.state == connState.ESTABLISHING).length,
             state: this.state
         };
@@ -146,17 +148,18 @@ class ServiceEngine extends EventEmitter implements Liveness {
 
     public getServiceEngineParams(): ServiceEngineInterface {
         return {
+            name: this.name,
             ip: this.ip,
-            port: this.port   
+            port: this.port
         }
     }
 
     public HandleConnections(): void {
         let liveness = this.getLiveness();
         console.log(liveness);
-        if(liveness.live + liveness.establishing < liveness.limit) {
+        if (liveness.live + liveness.establishing < liveness.limit) {
             let connObserver = this.setupConnection().subscribe((connection: Connection) => {
-                switch(connection.state) {
+                switch (connection.state) {
                     case connState.ERROR: {
                         this.errors++;
                         this.delConnection(connection);
@@ -186,13 +189,15 @@ class ServiceEngine extends EventEmitter implements Liveness {
     }
 
     private setStateAndEmit(state: ServiceEngineState) {
-        this.state = state;
-        this.emit(state);
+        if (this.state != state) {
+            this.state = state;
+            this.emit(state);
+        }
     }
 
     private handleConnectionEvents(): void {
-        this.connectionEventEmitter.on(CONNECTIONEVENT, (connection) => { 
-            switch(connection.state) {
+        this.connectionEventEmitter.on(CONNECTIONEVENT, (connection) => {
+            switch (connection.state) {
                 case connState.CONNECTED: {
                     this.setStateAndEmit(ServiceEngineState.LIVE);
                     this.emit(ServiceEngineState.LIVE);
@@ -214,13 +219,17 @@ class ServiceEngine extends EventEmitter implements Liveness {
         });
     }
 
+
     public runServiceEngine(): void {
         this.handleConnectionEvents();
-        this.HandleConnections();
+        setTimeout(() => {
+            this.HandleConnections();
+        }, 1000);
     }
 
-    constructor(ip: string, port: number) {
+    constructor(name: string, ip: string, port: number) {
         super();
+        this.name = name;
         this.ip = ip;
         this.port = port;
         this.agent = new http.Agent();
@@ -245,15 +254,13 @@ class ServiceEngineManager {
     }
 
     private listenEvents(se: ServiceEngine) {
-        se.on(ServiceEngineState.IDLE, () => {
-            this.controller.registerSe(se.getServiceEngineParams());
-        });
         se.on(ServiceEngineState.FAULTY, () => {
             //DISABLE temporrarily from RYU
             this.controller.disableSe(se.getServiceEngineParams());
         });
         se.on(ServiceEngineState.LIVE, () => {
             //REGISTER to RYU / or Re-REGISTER
+            console.log('Live event received');
             this.controller.enableSe(se.getServiceEngineParams());
         });
         se.on(ServiceEngineState.DEAD, () => {
@@ -262,12 +269,17 @@ class ServiceEngineManager {
         });
     }
 
+    private registerSe(se: ServiceEngine) {
+        this.controller.registerSe(se.getServiceEngineParams());
+    }
+
     public getServiceEngines(): Array<ServiceEngine> {
         return this.serviceEngines;
     }
 
     public addServiceEngine(se: ServiceEngine) {
         this.listenEvents(se);
+        this.registerSe(se);
         se.runServiceEngine();
         this.serviceEngines.push(se);
     }

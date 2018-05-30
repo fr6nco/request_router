@@ -9,7 +9,7 @@ export class HTTPListener {
         this.port = port;
         this.host = host;
         this.server = http.createServer((req, res) => {
-            console.log(req);
+            console.log('HTTP Request received');
             res.end();
         });
         this.server.on('clientError', (err, socket) => {
@@ -20,3 +20,5 @@ export class HTTPListener {
         });
     }
 }
+
+

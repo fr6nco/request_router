@@ -26,6 +26,8 @@ export class ControllerConnector extends EventEmitter{
 
     private status: string;
 
+    private cookie: number;
+
     public connect() {
         console.log(`trying to connect to ws://${this.controllerIP}:${this.controllerPort}/${this.wsurl}`);
         this.wsClient = new WebSocket(`ws://${this.controllerIP}:${this.controllerPort}/${this.wsurl}`);
@@ -35,6 +37,7 @@ export class ControllerConnector extends EventEmitter{
             this.wsClient.call('hello', [this.rrip, this.rrport]).then((res: any) => {
                 this.emit(ControllerConnectorEvents.CONNECTED);
                 console.log(res);
+                this.cookie = res;
             })
             .catch((err: any) => {
                 console.error(err);
@@ -57,7 +60,7 @@ export class ControllerConnector extends EventEmitter{
     }
 
     public registerSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('registerse', [se.ip, se.port]).then((res: any) => {
+        this.wsClient.call('registerse', [this.cookie, se.name, se.ip, se.port]).then((res: any) => {
             console.log(res);
         })
         .catch((err: any) => {
@@ -66,7 +69,7 @@ export class ControllerConnector extends EventEmitter{
     }
 
     public enableSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('enablese', [se.ip, se.port]).then((res: any) => {
+        this.wsClient.call('enablese', [this.cookie, se.name]).then((res: any) => {
             console.log(res);
         })
         .catch((err: any) => {
@@ -75,7 +78,7 @@ export class ControllerConnector extends EventEmitter{
     }
 
     public disableSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('disablese', [se.ip, se.port]).then((res: any) => {
+        this.wsClient.call('disablese', [this.cookie, se.name]).then((res: any) => {
             console.log(res);
         })
         .catch((err: any) => {
@@ -84,7 +87,7 @@ export class ControllerConnector extends EventEmitter{
     }
 
     public delSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('delse', [se.ip, se.port]).then((res: any) => {
+        this.wsClient.call('delse', [this.cookie, se.name]).then((res: any) => {
             console.log(res);
         })
         .catch((err: any) => {
