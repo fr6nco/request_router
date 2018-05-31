@@ -1,32 +1,23 @@
-import * as q from "bluebird"
+import * as Bluebird from "bluebird"
 import * as EventEmitter from "events"
-import { ServiceEngineInterface } from "../ServiceEngineManager/ServiceEngineManager"
+
+import { ServiceEngineInterface } from "../RequestRouter/ServiceEngineManager"
+import { RequestRouter, RouterInformation } from "../RequestRouter/RequestRouter"
 
 const WebSocket = require("rpc-websockets").Client
 const WebSocketServer = require('rpc-websockets').Server
 
 export enum ControllerConnectorEvents {
     CONNECTED = "CONNECTED",
-    ERROR = "ERROR"
+    ERROR = "ERROR",
 }
 
-export class ControllerConnector extends EventEmitter{
-
+export class ControllerConnector extends EventEmitter {
     private controllerIP: string;
     private controllerPort: number;
     private wsurl: string;
 
-    private rrip: string;
-    private rrport: number;
-
     private wsClient: any;
-    private wsServer: any;
-    private connectretries: number = 0;
-    private MAXCONNECTRETRIES: number = 5;
-
-    private status: string;
-
-    private cookie: number;
 
     public connect() {
         console.log(`trying to connect to ws://${this.controllerIP}:${this.controllerPort}/${this.wsurl}`);
@@ -34,19 +25,12 @@ export class ControllerConnector extends EventEmitter{
 
         this.wsClient.on('open', () => {
             console.log('Connected to websocket');
-            this.wsClient.call('hello', [this.rrip, this.rrport]).then((res: any) => {
-                this.emit(ControllerConnectorEvents.CONNECTED);
-                console.log(res);
-                this.cookie = res;
-            })
-            .catch((err: any) => {
-                console.error(err);
-            })
+            this.emit(ControllerConnectorEvents.CONNECTED);
         });
 
         this.wsClient.on('error', (err: any) => {
             console.error(err);
-            process.exit(1);
+            this.emit(ControllerConnectorEvents.ERROR);
         });
 
         this.wsClient.on('close', () => {
@@ -54,54 +38,132 @@ export class ControllerConnector extends EventEmitter{
         });
 
         process.on('SIGINT', () => {
-            console.log('Closing WS endpoint');
+            console.log('Cleaning up');
+            //TODO cleanup if needed
             this.wsClient.close();
         });
     }
 
-    public registerSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('registerse', [this.cookie, se.name, se.ip, se.port]).then((res: any) => {
-            console.log(res);
-        })
-        .catch((err: any) => {
-            console.error(err);
+    public registerRouter(rr: RouterInformation): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            this.wsClient.call('hello', [rr.ip, rr.port])
+                .then((res: any) => {
+                    let retobj = JSON.parse(res);
+                    if (retobj.code == 200) {
+                        resolve(retobj.cookie);
+                    } else if (retobj.code == 500) {
+                        reject(retobj.error);
+                    }
+                })
+                .catch((err: any) => {
+                    //TODO handle disconnection / error
+                    console.error(err);
+                    this.emit(ControllerConnectorEvents.ERROR);
+                });
         });
     }
 
-    public enableSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('enablese', [this.cookie, se.name]).then((res: any) => {
-            console.log(res);
-        })
-        .catch((err: any) => {
-            console.error(err);
+    public unregisterRouter(rr: RequestRouter): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            let delseCommands: Array<Bluebird<any>> = new Array();
+            let routerinfo = rr.getRouterInformation();
+
+            rr.getServiceEngines().forEach(se => {
+                delseCommands.push(this.delSe(se.getServiceEngineParams(), routerinfo));
+            });
+
+            Bluebird.all(delseCommands)
+                .then((res) => {
+                    console.log('All service engines removed');
+
+                    //TODO CALL THE ACTUAL UNREGISTER COMMAND
+                })
+                .catch((err) => {
+                    console.error('Error while removing service engines');
+                    console.error(err);
+                });
         });
     }
 
-    public disableSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('disablese', [this.cookie, se.name]).then((res: any) => {
-            console.log(res);
-        })
-        .catch((err: any) => {
-            console.error(err);
+    public registerSe(se: ServiceEngineInterface, rr: RouterInformation): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            this.wsClient.call('registerse', [rr.cookie, se.name, se.ip, se.port])
+                .then((res: any) => {
+                    console.log(res);
+                    let retobj = JSON.parse(res);
+                    if (retobj.code == 200) {
+                        resolve(retobj.message);
+                    } else if (retobj.code == 500) {
+                        reject(retobj.error);
+                    }
+                })
+                .catch((err: any) => {
+                    console.error(err);
+                    reject(err);
+                });
         });
     }
 
-    public delSe(se: ServiceEngineInterface): void {
-        this.wsClient.call('delse', [this.cookie, se.name]).then((res: any) => {
-            console.log(res);
-        })
-        .catch((err: any) => {
-            console.error(err);
+    public enableSe(se: ServiceEngineInterface, rr: RouterInformation): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            this.wsClient.call('enablese', [rr.cookie, se.name])
+                .then((res: any) => {
+                    console.log(res);
+                    let retobj = JSON.parse(res);
+                    if (retobj.code == 200) {
+                        resolve(retobj.message);
+                    } else if (retobj.code == 500) {
+                        reject(retobj.error);
+                    }
+                })
+                .catch((err: any) => {
+                    console.error(err);
+                });
         });
     }
 
-    constructor(host: string, port: number, url: string, rrip: string, rrport: number) {
+    public disableSe(se: ServiceEngineInterface, rr: RouterInformation): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            this.wsClient.call('disablese', [rr.cookie, se.name])
+                .then((res: any) => {
+                    console.log(res);
+                    let retobj = JSON.parse(res);
+                    if (retobj.code == 200) {
+                        resolve(retobj.message);
+                    } else if (retobj.code == 500) {
+                        reject(retobj.error);
+                    }
+                })
+                .catch((err: any) => {
+                    console.error(err);
+                });
+        });
+    }
+
+
+    public delSe(se: ServiceEngineInterface, rr: RouterInformation): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            this.wsClient.call('delse', [rr.cookie, se.name])
+                .then((res: any) => {
+                    let retobj = JSON.parse(res);
+                    if (retobj.code == 200) {
+                        resolve(retobj.message);
+                    } else if (retobj.code == 500) {
+                        reject(retobj.error);
+                    }
+                })
+                .catch((err: any) => {
+                    console.error(err);
+                    reject(err);
+                });
+        });
+    }
+
+    constructor(host: string, port: number, url: string) {
         super();
         this.controllerIP = host;
         this.controllerPort = port;
         this.wsurl = url;
-        this.rrip = rrip;
-        this.rrport = rrport;
         this.connect();
     }
 }

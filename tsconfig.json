@@ -2,9 +2,10 @@
     "files": [
         "src/app.ts",
         "src/modules/HTTPListener/HTTPListener.ts",
-        "src/modules/ServiceEngineManager/ServiceEngineManager.ts",
-        "src/modules/SessionManager/SessionManager.ts",
-        "src/modules/ControllerConnector/ControllerConnector.ts"
+        "src/modules/ControllerConnector/ControllerConnector.ts",
+        "src/modules/RequestRouter/RequestRouter.ts",
+        "src/modules/RequestRouter/SEConnection.ts",
+        "src/modules/RequestRouter/ServiceEngineManager.ts",
     ],
     "compilerOptions": {
         "noImplicitAny": true,
