@@ -37,7 +37,6 @@ class ControllerConnector extends EventEmitter {
 
         process.on('SIGINT', () => {
             console.log('Cleaning up');
-            //TODO wait for cleanup
             this.wsClient.close();
         });
     }

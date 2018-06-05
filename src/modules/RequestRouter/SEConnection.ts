@@ -6,7 +6,8 @@ export enum connState {
     ESTABLISHING = 'ESTABLISHING',
     CONNECTED = 'CONNECTED',
     ERROR = 'ERROR',
-    CLOSED = 'CLOSED'
+    CLOSED = 'CLOSED',
+    FAILED = 'FAILED'
 }
 
 //Connection class
@@ -17,6 +18,7 @@ export class SEConnection extends EventEmitter {
     dest_ip: string;
     dest_port: number
     state: connState;
+    wasConnected: boolean;
 
     public constructor(dest_ip: string, dest_port: number, source_ip: string) {
         super();
@@ -24,6 +26,7 @@ export class SEConnection extends EventEmitter {
         this.dest_ip = dest_ip;
         this.dest_port = dest_port;
         this.state = connState.ESTABLISHING;
+        this.wasConnected = false;
         this.connect();
     }
 
@@ -34,7 +37,7 @@ export class SEConnection extends EventEmitter {
     }
 
     //Starts connection
-    public connect() {
+    private connect() {
         let connectionOptions: net.TcpSocketConnectOpts = {
             host: this.dest_ip,
             port: this.dest_port,
@@ -45,6 +48,7 @@ export class SEConnection extends EventEmitter {
         this.socket = net.createConnection(connectionOptions, () => {
             this.source_port = this.socket.localPort;
             console.log(`Connected to Service Engine on ${this.source_ip}:${this.source_port} <->${this.dest_ip}:${this.dest_port}`);
+            this.wasConnected = true;
             this.setAndEmitState(connState.CONNECTED);
         });
 
@@ -53,7 +57,15 @@ export class SEConnection extends EventEmitter {
         })
 
         this.socket.on('close', (hadError) => {
-            this.setAndEmitState(hadError ? connState.ERROR : connState.CLOSED);
+            if(hadError) {
+                if(this.wasConnected) {
+                    this.setAndEmitState(connState.FAILED);
+                } else {
+                    this.setAndEmitState(connState.ERROR);
+                }
+            } else {
+                this.setAndEmitState(connState.CLOSED);
+            }
         });
     }
 

@@ -41,6 +41,7 @@ class RequestRouter {
                 .then((message) => {
                     console.log(message);
                     se.removeAllListeners();
+                    this.removeServiceEngine(se);
                 })
                 .catch((err) => {
                     console.error(err);
@@ -51,6 +52,7 @@ class RequestRouter {
                 .then((message) => {
                     console.log(message);
                     se.removeAllListeners();
+                    this.removeServiceEngine(se);
                 })
                 .catch((err) => {
                     console.error(err);
@@ -83,7 +85,7 @@ class RequestRouter {
         if (this.isControllerActive()) {
             this.registerSe(se)
                 .then((message) => {
-                    se.HandleConnections();
+                    se.startServiceEngine();
                 })
                 .catch((err) => {
                     console.error('Failed to register service engine: ' + err);
