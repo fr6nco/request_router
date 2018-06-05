@@ -18,7 +18,8 @@ enum ServiceEngineState {
     LIVE = "LIVE",
     FAULTY = "FAULTY", //Starts a timer for 30 sec, if wont go back to live goes DEAD, SE is removed
     DEAD = "DEAD",
-    IDLE = "IDLE"
+    IDLE = "IDLE",
+    SHUTDOWN = "SHUTDOWN"
 }
 
 interface ServiceEngineInterface {
@@ -81,42 +82,9 @@ class ServiceEngine extends EventEmitter implements Liveness {
             conn.on(connState.CLOSED, () => {
                 observer.next(conn);
             });
-
-            observer.next(conn);
         });
     }
 
-    public getServiceEngineParams(): ServiceEngineInterface {
-        return {
-            name: this.name,
-            ip: this.ip,
-            port: this.port
-        }
-    }
-
-    public HandleConnections(): void {
-        let liveness = this.getLiveness();
-        console.log(liveness);
-        if (liveness.live + liveness.establishing < liveness.limit) {
-            let connObserver = this.setupConnection().subscribe((connection: SEConnection) => {
-                switch (connection.state) {
-                    case connState.ERROR: {
-                        this.errors++;
-                        this.delConnection(connection);
-                        connObserver.unsubscribe();
-                        break;
-                    }
-                    case connState.CLOSED: {
-                        this.delConnection(connection);
-                        connObserver.unsubscribe();
-                        break;
-                    }
-                }
-                this.HandleConnections();
-                this.connectionEventEmitter.emit(CONNECTIONEVENT, connection);
-            });
-        }
-    }
 
     private handleFaultyTimerTimeout(): void {
         console.log('Faulty Timer exceeded');
@@ -140,7 +108,6 @@ class ServiceEngine extends EventEmitter implements Liveness {
             switch (connection.state) {
                 case connState.CONNECTED: {
                     this.setStateAndEmit(ServiceEngineState.LIVE);
-                    this.emit(ServiceEngineState.LIVE);
                     if (this.faultyTimer) {
                         clearTimeout(this.faultyTimer);
                     }
@@ -159,11 +126,51 @@ class ServiceEngine extends EventEmitter implements Liveness {
         });
     }
 
+    public getServiceEngineParams(): ServiceEngineInterface {
+        return {
+            name: this.name,
+            ip: this.ip,
+            port: this.port
+        }
+    }
+
+    public HandleConnections(): void {
+        let liveness = this.getLiveness();
+        if (liveness.live + liveness.establishing < liveness.limit) {
+            let connObserver = this.setupConnection().subscribe((connection: SEConnection) => {
+                switch (connection.state) {
+                    case connState.ERROR: {
+                        this.errors++;
+                        this.delConnection(connection);
+                        connObserver.unsubscribe();
+                        break;
+                    }
+                    case connState.CLOSED: {
+                        this.delConnection(connection);
+                        connObserver.unsubscribe();
+                        break;
+                    }
+                }
+                this.HandleConnections();
+                this.connectionEventEmitter.emit(CONNECTIONEVENT, connection);
+            });
+        }
+        console.log(this.getLiveness());
+    }
+
     public runServiceEngine(): void {
         this.handleConnectionEvents();
         setTimeout(() => {
             this.HandleConnections();
         }, 1000);
+    }
+
+    public stopServiceEngine(): void {
+        this.limit = 0;
+        this.connections.forEach(conn => {
+            conn.close();
+        });
+        this.setStateAndEmit(ServiceEngineState.SHUTDOWN);
     }
 
     constructor(name: string, ip: string, port: number) {

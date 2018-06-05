@@ -5,7 +5,7 @@
         "src/modules/ControllerConnector/ControllerConnector.ts",
         "src/modules/RequestRouter/RequestRouter.ts",
         "src/modules/RequestRouter/SEConnection.ts",
-        "src/modules/RequestRouter/ServiceEngineManager.ts",
+        "src/modules/RequestRouter/ServiceEngine.ts",
     ],
     "compilerOptions": {
         "noImplicitAny": true,

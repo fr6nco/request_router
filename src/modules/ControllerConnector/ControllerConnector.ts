@@ -1,22 +1,22 @@
 import * as Bluebird from "bluebird"
 import * as EventEmitter from "events"
 
-import { ServiceEngineInterface } from "../RequestRouter/ServiceEngineManager"
+import { ServiceEngineInterface } from "../RequestRouter/ServiceEngine"
 import { RequestRouter, RouterInformation } from "../RequestRouter/RequestRouter"
 
 const WebSocket = require("rpc-websockets").Client
 const WebSocketServer = require('rpc-websockets').Server
 
-export enum ControllerConnectorEvents {
+enum ControllerConnectorStates {
     CONNECTED = "CONNECTED",
-    ERROR = "ERROR",
+    CLOSED = "CLOSED"
 }
 
-export class ControllerConnector extends EventEmitter {
+class ControllerConnector extends EventEmitter {
     private controllerIP: string;
     private controllerPort: number;
     private wsurl: string;
-
+    private state: ControllerConnectorStates;
     private wsClient: any;
 
     public connect() {
@@ -24,41 +24,37 @@ export class ControllerConnector extends EventEmitter {
         this.wsClient = new WebSocket(`ws://${this.controllerIP}:${this.controllerPort}/${this.wsurl}`);
 
         this.wsClient.on('open', () => {
-            console.log('Connected to websocket');
-            this.emit(ControllerConnectorEvents.CONNECTED);
+            this.setStateAndEmit(ControllerConnectorStates.CONNECTED);
         });
 
         this.wsClient.on('error', (err: any) => {
             console.error(err);
-            this.emit(ControllerConnectorEvents.ERROR);
         });
 
         this.wsClient.on('close', () => {
-            console.log('ws endpoint closed');
+            this.setStateAndEmit(ControllerConnectorStates.CLOSED);
         });
 
         process.on('SIGINT', () => {
             console.log('Cleaning up');
-            //TODO cleanup if needed
+            //TODO wait for cleanup
             this.wsClient.close();
         });
     }
 
     public registerRouter(rr: RouterInformation): Bluebird<any> {
-        return new Bluebird.Promise((resolve, reject) => {
+        return new Bluebird.Promise((resolve, reject) => {            
             this.wsClient.call('hello', [rr.ip, rr.port])
                 .then((res: any) => {
                     let retobj = JSON.parse(res);
                     if (retobj.code == 200) {
-                        resolve(retobj.cookie);
-                    } else if (retobj.code == 500) {
-                        reject(retobj.error);
+                        resolve(retobj.message);
+                    } else {
+                        reject(retobj);
                     }
                 })
                 .catch((err: any) => {
-                    //TODO handle disconnection / error
                     console.error(err);
-                    this.emit(ControllerConnectorEvents.ERROR);
                 });
         });
     }
@@ -93,8 +89,8 @@ export class ControllerConnector extends EventEmitter {
                     let retobj = JSON.parse(res);
                     if (retobj.code == 200) {
                         resolve(retobj.message);
-                    } else if (retobj.code == 500) {
-                        reject(retobj.error);
+                    } else {
+                        reject(retobj.message);
                     }
                 })
                 .catch((err: any) => {
@@ -112,8 +108,8 @@ export class ControllerConnector extends EventEmitter {
                     let retobj = JSON.parse(res);
                     if (retobj.code == 200) {
                         resolve(retobj.message);
-                    } else if (retobj.code == 500) {
-                        reject(retobj.error);
+                    } else {
+                        reject(retobj.message);
                     }
                 })
                 .catch((err: any) => {
@@ -130,8 +126,8 @@ export class ControllerConnector extends EventEmitter {
                     let retobj = JSON.parse(res);
                     if (retobj.code == 200) {
                         resolve(retobj.message);
-                    } else if (retobj.code == 500) {
-                        reject(retobj.error);
+                    } else {
+                        reject(retobj.message);
                     }
                 })
                 .catch((err: any) => {
@@ -140,7 +136,6 @@ export class ControllerConnector extends EventEmitter {
         });
     }
 
-
     public delSe(se: ServiceEngineInterface, rr: RouterInformation): Bluebird<any> {
         return new Bluebird.Promise((resolve, reject) => {
             this.wsClient.call('delse', [rr.cookie, se.name])
@@ -148,8 +143,8 @@ export class ControllerConnector extends EventEmitter {
                     let retobj = JSON.parse(res);
                     if (retobj.code == 200) {
                         resolve(retobj.message);
-                    } else if (retobj.code == 500) {
-                        reject(retobj.error);
+                    } else {
+                        reject(retobj.message);
                     }
                 })
                 .catch((err: any) => {
@@ -157,6 +152,15 @@ export class ControllerConnector extends EventEmitter {
                     reject(err);
                 });
         });
+    }
+
+    private setStateAndEmit(state: ControllerConnectorStates) {
+        this.state = state;
+        this.emit(state);
+    }
+
+    public getState(): ControllerConnectorStates {
+        return this.state;
     }
 
     constructor(host: string, port: number, url: string) {
@@ -167,3 +171,6 @@ export class ControllerConnector extends EventEmitter {
         this.connect();
     }
 }
+
+export { ControllerConnectorStates };
+export { ControllerConnector };
