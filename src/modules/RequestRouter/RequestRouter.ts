@@ -47,17 +47,57 @@ class RequestRouter {
                     console.error(err);
                 });
         });
-        se.on(ServiceEngineState.SHUTDOWN, () => {
-            this.controller.delSe(se.getServiceEngineParams(), this.getRouterInformation())
-                .then((message) => {
-                    console.log(message);
-                    se.removeAllListeners();
-                    this.removeServiceEngine(se);
+    }
+
+
+    private unregisterRouter() {
+        if (this.isControllerActive()) {
+            this.cleanSESessions()
+                .then(() => {
+                    this.controller.unregisterRouter(this.getRouterInformation())
+                        .then((message) => {
+                            console.log(message);
+                            this.controller.close();
+                        })
+                        .catch((err) => {
+                            console.error(err);
+                        });
                 })
                 .catch((err) => {
                     console.error(err);
                 });
-        })
+        } else {
+            console.log('Connector is not active no need for cleanup');
+        }
+    }
+
+    private cleanSESessions(): Bluebird<any> {
+        return new Bluebird.Promise((resolve, reject) => {
+            let seCount = this.serviceEngines.length;
+            let closedcount = 0;
+
+            this.serviceEngines.forEach((se: ServiceEngine) => {
+                se.on(ServiceEngineState.IDLE, () => {
+                    this.controller.delSe(se.getServiceEngineParams(), this.getRouterInformation())
+                        .then((message) => {
+                            console.log(message);
+
+                            closedcount++;
+                            if (seCount == closedcount) {
+                                console.log('All Sessions closed');
+                                resolve();
+                            }
+                        })
+                        .catch((err) => {
+                            reject(err);
+                        });
+
+                    se.removeAllListeners();
+                });
+
+                this.removeServiceEngine(se);
+            });
+        });
     }
 
     private registerRouter() {
@@ -70,6 +110,10 @@ class RequestRouter {
                     //Register Service Engines, once the router is registered
                     this.getServiceEngines().forEach((se: ServiceEngine) => {
                         this.checkAndRegisterSe(se);
+                    });
+
+                    process.on('SIGINT', () => {
+                        this.unregisterRouter();
                     });
                 })
                 .catch((err) => {
@@ -85,6 +129,7 @@ class RequestRouter {
         if (this.isControllerActive()) {
             this.registerSe(se)
                 .then((message) => {
+                    //After successful registration we start the service engien
                     se.startServiceEngine();
                 })
                 .catch((err) => {
@@ -116,6 +161,7 @@ class RequestRouter {
 
         this.controller.on(ControllerConnectorStates.CLOSED, () => {
             this.controllerState = ControllerConnectorStates.CLOSED;
+            //TODO do come cleanup probably (remove sessions for SEs)
         });
     }
 

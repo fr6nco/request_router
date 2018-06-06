@@ -35,10 +35,6 @@ class ControllerConnector extends EventEmitter {
             this.setStateAndEmit(ControllerConnectorStates.CLOSED);
         });
 
-        process.on('SIGINT', () => {
-            console.log('Cleaning up');
-            this.wsClient.close();
-        });
     }
 
     public registerRouter(rr: RouterInformation): Bluebird<any> {
@@ -54,28 +50,25 @@ class ControllerConnector extends EventEmitter {
                 })
                 .catch((err: any) => {
                     console.error(err);
+                    reject(err);
                 });
         });
     }
 
-    public unregisterRouter(rr: RequestRouter): Bluebird<any> {
+    public unregisterRouter(rr: RouterInformation): Bluebird<any> {
         return new Bluebird.Promise((resolve, reject) => {
-            let delseCommands: Array<Bluebird<any>> = new Array();
-            let routerinfo = rr.getRouterInformation();
-
-            rr.getServiceEngines().forEach(se => {
-                delseCommands.push(this.delSe(se.getServiceEngineParams(), routerinfo));
-            });
-
-            Bluebird.all(delseCommands)
-                .then((res) => {
-                    console.log('All service engines removed');
-
-                    //TODO CALL THE ACTUAL UNREGISTER COMMAND
+            this.wsClient.call('goodbye', [rr.cookie])
+                .then((res: any) => {
+                    let retobj = JSON.parse(res);
+                    if (retobj.code == 200){
+                        resolve(retobj.message);
+                    } else {
+                        reject(retobj);
+                    }
                 })
-                .catch((err) => {
-                    console.error('Error while removing service engines');
+                .catch((err: any) => {
                     console.error(err);
+                    reject(err);
                 });
         });
     }
@@ -113,6 +106,7 @@ class ControllerConnector extends EventEmitter {
                 })
                 .catch((err: any) => {
                     console.error(err);
+                    reject(err);
                 });
         });
     }
@@ -131,6 +125,7 @@ class ControllerConnector extends EventEmitter {
                 })
                 .catch((err: any) => {
                     console.error(err);
+                    reject(err);
                 });
         });
     }
@@ -160,6 +155,10 @@ class ControllerConnector extends EventEmitter {
 
     public getState(): ControllerConnectorStates {
         return this.state;
+    }
+
+    public close() {
+        this.wsClient.close();
     }
 
     constructor(host: string, port: number, url: string) {

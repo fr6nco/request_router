@@ -18,7 +18,7 @@ let se = new ServiceEngine('se1', '10.10.0.2', 80);
 requestRouter.addServiceEngine(se);
 
 process.on('SIGINT', () => {
-    console.log('SIGINT captured, waiting for ws connection to close');
+    console.log('SIGINT captured, waiting for cleanup');
     setTimeout(() => {
         process.exit(0);
     }, 1000);
